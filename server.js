@@ -16,8 +16,8 @@ app.get('/', (req, res) => {
 });
 
 // Örnek koltuk rotaları
-let soldSeats = [];
-let lockedSeats = [];
+
+
 
 app.get('/seats-status', (req, res) => {
     res.json({ soldSeats, lockedSeats });

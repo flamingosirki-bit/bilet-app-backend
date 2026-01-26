@@ -3,7 +3,10 @@ const cors = require('cors');
 
 const app = express(); // app burada tanımlanmalı
 
-app.use(cors({ origin: 'https://bilet-app-frontend-1.onrender.com' }));
+app.use(cors({ 
+origin: 'https://bilet-app-frontend-1.onrender.com'
+credentials: true
+ }));
 app.use(express.json());
 app.get('/', (req, res) => {
     res.send('Bilet App Backend çalışıyor!');

@@ -1,24 +1,46 @@
 const express = require('express');
 const cors = require('cors');
 
-const app = express(); // app burada tanımlanmalı
+const app = express();
 
-app.use(cors({ 
-origin: 'https://bilet-app-frontend-1.onrender.com',
-credentials: true
- }));
+// ✅ CORS ayarı doğru
+app.use(cors({
+  origin: 'https://bilet-app-frontend-1.onrender.com',
+  credentials: true
+}));
+
 app.use(express.json());
+
 app.get('/', (req, res) => {
     res.send('Bilet App Backend çalışıyor!');
 });
 
-// Burada route’lar ve diğer middleware’ler
+// Örnek koltuk rotaları
+let soldSeats = [];
+let lockedSeats = [];
+
 app.get('/seats-status', (req, res) => {
-    res.json({ soldSeats: [], lockedSeats: [] });
+    res.json({ soldSeats, lockedSeats });
+});
+
+app.post('/lock-seats', (req, res) => {
+    const { selectedSeats } = req.body;
+    selectedSeats.forEach(seat => {
+        if (!lockedSeats.includes(seat)) lockedSeats.push(seat);
+    });
+    res.json({ lockedSeats: selectedSeats });
+});
+
+app.post('/checkout', (req, res) => {
+    const { cart } = req.body;
+    soldSeats.push(...cart);
+    lockedSeats = lockedSeats.filter(seat => !cart.includes(seat));
+    res.json({ purchased: cart });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server çalışıyor → http://localhost:${PORT}`));
+
 
 
 // Satılmış ve locked koltukları tutacak örnek veri

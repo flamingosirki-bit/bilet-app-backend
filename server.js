@@ -3,96 +3,86 @@ const cors = require('cors');
 
 const app = express();
 
-// ✅ CORS ayarı doğru
+// ✅ CORS ayarı: birden fazla frontend için izin
+const allowedOrigins = [
+  'https://bilet-app-frontend-1.onrender.com',
+  'https://bilet-app-frontend-5.onrender.com'
+];
+
 app.use(cors({
-  origin: 'https://bilet-app-frontend-1.onrender.com',
+  origin: function(origin, callback){
+    if(!origin) return callback(null, true); // Postman veya server-side request’ler için
+    if(allowedOrigins.indexOf(origin) === -1){
+      const msg = 'CORS policy: Access denied for ' + origin;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true
 }));
 
 app.use(express.json());
 
+// ✅ Backend veri
+let soldSeats = [];     // Satılmış koltuklar
+let lockedSeats = [];   // Geçici olarak seçilen koltuklar (sepette)
+
+const rows = [];
+for (let i = 0; i < 30; i++) {
+  rows.push(i < 26 ? String.fromCharCode(65 + i) : "A" + String.fromCharCode(65 + i - 26));
+}
+const seatsPerRow = 30;
+
+// ------------------ ROUTES ------------------ //
+
+// Test endpoint
 app.get('/', (req, res) => {
     res.send('Bilet App Backend çalışıyor!');
 });
 
-// Örnek koltuk rotaları
-
-
-
+// 1️⃣ Koltuk durumunu döndür
 app.get('/seats-status', (req, res) => {
-    res.json({ soldSeats, lockedSeats });
-});
-
-app.post('/lock-seats', (req, res) => {
-    const { selectedSeats } = req.body;
-    selectedSeats.forEach(seat => {
-        if (!lockedSeats.includes(seat)) lockedSeats.push(seat);
-    });
-    res.json({ lockedSeats: selectedSeats });
-});
-
-app.post('/checkout', (req, res) => {
-    const { cart } = req.body;
-    soldSeats.push(...cart);
-    lockedSeats = lockedSeats.filter(seat => !cart.includes(seat));
-    res.json({ purchased: cart });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server çalışıyor → http://localhost:${PORT}`));
-
-
-
-// Satılmış ve locked koltukları tutacak örnek veri
-let soldSeats = [];      // Satılmış koltuklar
-let lockedSeats = [];    // Seçili / locked koltuklar
-let userCart = {};       // Kullanıcı bazlı cart
-
-// 1️⃣ Koltuk durumunu döndüren endpoint
-app.get("/seats-status", (req, res) => {
   res.json({
     soldSeats,
     lockedSeats
   });
 });
 
-// 2️⃣ Lock seats (seçim)
-app.post("/lock-seats", (req, res) => {
+// 2️⃣ Koltuk kilitleme
+app.post('/lock-seats', (req, res) => {
   const { selectedSeats, userId, isBonus } = req.body;
-  userCart[userId] = userCart[userId] || { cart: [], bonusRemaining: 0 };
-  const cart = userCart[userId];
 
-  const locked = [];
+  const lockedThisRequest = [];
 
-  selectedSeats.forEach(id => {
-    if (!soldSeats.includes(id) && !lockedSeats.includes(id)) {
-      lockedSeats.push(id);
-      locked.push(id);
-      cart.cart.push(id);
+  selectedSeats.forEach(seatId => {
+    if (!soldSeats.includes(seatId) && !lockedSeats.includes(seatId)) {
+      lockedSeats.push(seatId);
+      lockedThisRequest.push(seatId);
     }
   });
 
-  res.json({ lockedSeats: locked, cart });
+  res.json({ lockedSeats: lockedThisRequest });
 });
 
-// 3️⃣ Checkout
-app.post("/checkout", (req, res) => {
-  const { userId, cart: selectedCart } = req.body;
-  const cart = userCart[userId];
+// 3️⃣ Satın alma
+app.post('/checkout', (req, res) => {
+  const { cart } = req.body;
 
-  if (!cart) return res.json({ purchased: [], bonusRemaining: 0 });
+  const purchased = [];
 
-  // Sepetteki koltukları satılmış yap
-  selectedCart.forEach(id => {
-    if (!soldSeats.includes(id)) soldSeats.push(id);
-    lockedSeats = lockedSeats.filter(l => l !== id);
+  cart.forEach(seatId => {
+    if (!soldSeats.includes(seatId)) {
+      soldSeats.push(seatId);
+      purchased.push(seatId);
+    }
+    // Satın alındıktan sonra lockedSeats’ten çıkar
+    lockedSeats = lockedSeats.filter(id => id !== seatId);
   });
 
-  const purchased = [...selectedCart];
-  cart.cart = [];
-  cart.bonusRemaining = purchased.length; // her satın alınan koltuk için 1 bonus
-
-  res.json({ purchased, bonusRemaining: cart.bonusRemaining });
+  res.json({ purchased });
 });
 
-app.listen(3000, () => console.log("Server çalışıyor → http://localhost:3000"));
+// ------------------ SERVER ------------------ //
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server ${PORT} portunda çalışıyor`));

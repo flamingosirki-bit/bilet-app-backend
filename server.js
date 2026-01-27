@@ -1,9 +1,10 @@
+// ------------------ IMPORTS ------------------ //
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
 
-// ✅ CORS ayarı: birden fazla frontend için izin
+// ------------------ CORS AYARI ------------------ //
 const allowedOrigins = [
   'https://bilet-app-frontend-1.onrender.com',
   'https://bilet-app-frontend-5.onrender.com'
@@ -21,13 +22,64 @@ app.use(cors({
   credentials: true
 }));
 
+// ------------------ BODY PARSER ------------------ //
 app.use(express.json());
 
+// ------------------ SEAT DATA ------------------ //
+const rows = [];
+for (let i = 0; i < 30; i++) {
+  rows.push(i < 26 ? String.fromCharCode(65 + i) : "A" + String.fromCharCode(65 + i - 26));
+}
+const seatsPerRow = 30;
+
+let soldSeats = [];   // Satın alınan koltuklar
+let lockedSeats = {}; // { seatId: userId }
+
+// ------------------ ROUTES ------------------ //
 app.get('/', (req, res) => {
     res.send('Bilet App Backend çalışıyor!');
 });
 
-// Diğer backend route’ları (lock-seats, seats-status, checkout) buraya gelecek
+// Koltuk durumunu gönder
+app.get('/seats-status', (req, res) => {
+  res.json({
+    soldSeats,
+    lockedSeats: Object.keys(lockedSeats)
+  });
+});
 
+// Koltuk kilitle
+app.post('/lock-seats', (req, res) => {
+  const { selectedSeats, userId } = req.body;
+  const locked = [];
+
+  selectedSeats.forEach(seatId => {
+    if (soldSeats.includes(seatId)) return; // Satıldıysa kilitleme
+    if (!lockedSeats[seatId]) {
+      lockedSeats[seatId] = userId;
+      locked.push(seatId);
+    }
+  });
+
+  res.json({ lockedSeats: locked });
+});
+
+// Checkout
+app.post('/checkout', (req, res) => {
+  const { cart, userId } = req.body;
+  const purchased = [];
+
+  cart.forEach(seatId => {
+    if (lockedSeats[seatId] === userId && !soldSeats.includes(seatId)) {
+      soldSeats.push(seatId);
+      purchased.push(seatId);
+      delete lockedSeats[seatId]; // Kilidi kaldır
+    }
+  });
+
+  res.json({ purchased });
+});
+
+// ------------------ SERVER ------------------ //
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server ${PORT} portunda çalışıyor`));

@@ -64,6 +64,21 @@ app.post('/lock-seats', (req, res) => {
   res.json({ lockedSeats: locked });
 });
 
+// Koltuk unlock (iptal)
+app.post('/unlock-seats', (req, res) => {
+  const { seatsToUnlock, userId } = req.body;
+  const unlocked = [];
+
+  seatsToUnlock.forEach(seatId => {
+    if (lockedSeats[seatId] === userId) {
+      delete lockedSeats[seatId];
+      unlocked.push(seatId);
+    }
+  });
+
+  res.json({ unlockedSeats: unlocked });
+});
+
 // Checkout
 app.post('/checkout', (req, res) => {
   const { cart, userId } = req.body;

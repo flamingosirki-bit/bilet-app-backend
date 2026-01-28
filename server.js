@@ -33,7 +33,11 @@ for (let i = 0; i < 30; i++) {
 const seatsPerRow = 30;
 
 let soldSeats = [];   // Satın alınan koltuklar
-let lockedSeats = {}; // { seatId: userId }
+let lockedSeats = {
+  A1: { userId: "user1", timestamp: 123456 },
+  B5: { userId: "user2", timestamp: 123457 }
+};
+
 
 // ------------------ ROUTES ------------------ //
 app.get('/', (req, res) => {
@@ -44,9 +48,10 @@ app.get('/', (req, res) => {
 app.get('/seats-status', (req, res) => {
   res.json({
     soldSeats,
-    lockedSeats: Object.keys(lockedSeats)
+    lockedSeats
   });
 });
+
 
 // Koltuk kilitle
 app.post('/lock-seats', (req, res) => {
@@ -54,9 +59,9 @@ app.post('/lock-seats', (req, res) => {
   const locked = [];
 
   selectedSeats.forEach(seatId => {
-    if (soldSeats.includes(seatId)) return; // Satıldıysa kilitleme
+    if (soldSeats.includes(seatId)) return;
     if (!lockedSeats[seatId]) {
-      lockedSeats[seatId] = userId;
+      lockedSeats[seatId] = { userId, time: Date.now() };
       locked.push(seatId);
     }
   });
@@ -64,13 +69,14 @@ app.post('/lock-seats', (req, res) => {
   res.json({ lockedSeats: locked });
 });
 
+
 // Koltuk unlock (iptal)
 app.post('/unlock-seats', (req, res) => {
-  const { seatsToUnlock, userId } = req.body;
+  const { selectedSeats, userId } = req.body;
   const unlocked = [];
 
-  seatsToUnlock.forEach(seatId => {
-    if (lockedSeats[seatId] === userId) {
+  selectedSeats.forEach(seatId => {
+    if (lockedSeats[seatId]?.userId === userId) {
       delete lockedSeats[seatId];
       unlocked.push(seatId);
     }
@@ -79,13 +85,14 @@ app.post('/unlock-seats', (req, res) => {
   res.json({ unlockedSeats: unlocked });
 });
 
+
 // Checkout
 app.post('/checkout', (req, res) => {
   const { cart, userId } = req.body;
   const purchased = [];
 
   cart.forEach(seatId => {
-    if (lockedSeats[seatId] === userId && !soldSeats.includes(seatId)) {
+    if (lockedSeats[seatId]?.userId === userId && !soldSeats.includes(seatId)) {
       soldSeats.push(seatId);
       purchased.push(seatId);
       delete lockedSeats[seatId]; // Kilidi kaldır

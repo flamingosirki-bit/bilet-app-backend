@@ -33,42 +33,50 @@ for (let i = 0; i < 30; i++) {
 const seatsPerRow = 30;
 
 let soldSeats = [];   // Satın alınan koltuklar
-let lockedSeats = {
-  A1: { userId: "user1", timestamp: 123456 },
-  B5: { userId: "user2", timestamp: 123457 }
-};
+let lockedSeats = {}; // Kilitli koltuklar
 
+// ------------------ KİLİT SÜRESİ ------------------ //
+const LOCK_TIMEOUT = 5 * 60 * 1000; // 5 dakika
+
+// ------------------ YARDIMCI FONKSİYONLAR ------------------ //
+function clearExpiredLocks() {
+  const now = Date.now();
+  Object.entries(lockedSeats).forEach(([seatId, info]) => {
+    if (now - info.timestamp > LOCK_TIMEOUT) {
+      delete lockedSeats[seatId];
+    }
+  });
+}
 
 // ------------------ ROUTES ------------------ //
 app.get('/', (req, res) => {
-    res.send('Bilet App Backend çalışıyor!');
+  res.send('Bilet App Backend çalışıyor!');
 });
 
 // Koltuk durumunu gönder
 app.get('/seats-status', (req, res) => {
-  res.json({
-    soldSeats,
-    lockedSeats
-  });
+  clearExpiredLocks();
+  res.json({ soldSeats, lockedSeats });
 });
-
 
 // Koltuk kilitle
 app.post('/lock-seats', (req, res) => {
+  clearExpiredLocks(); // Kilit süresi dolmuş koltukları temizle
+
   const { selectedSeats, userId } = req.body;
   const locked = [];
+  const now = Date.now();
 
   selectedSeats.forEach(seatId => {
-    if (soldSeats.includes(seatId)) return;
-    if (!lockedSeats[seatId]) {
-      lockedSeats[seatId] = { userId, time: Date.now() };
+    if (soldSeats.includes(seatId)) return;          // Satılmışsa atla
+    if (!lockedSeats[seatId]) {                      // Kilitli değilse kilitle
+      lockedSeats[seatId] = { userId, timestamp: now };
       locked.push(seatId);
     }
   });
 
   res.json({ lockedSeats: locked });
 });
-
 
 // Koltuk unlock (iptal)
 app.post('/unlock-seats', (req, res) => {
@@ -85,8 +93,7 @@ app.post('/unlock-seats', (req, res) => {
   res.json({ unlockedSeats: unlocked });
 });
 
-
-// Checkout
+// Checkout (satın al)
 app.post('/checkout', (req, res) => {
   const { cart, userId } = req.body;
   const purchased = [];
@@ -105,3 +112,6 @@ app.post('/checkout', (req, res) => {
 // ------------------ SERVER ------------------ //
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server ${PORT} portunda çalışıyor`));
+
+// ------------------ OTOMATİK KİLİT TEMİZLEME ------------------ //
+setInterval(clearExpiredLocks, 60 * 1000); // Her dakika çalışır

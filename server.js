@@ -56,7 +56,13 @@ app.get('/', (req, res) => {
 // Koltuk durumunu gönder
 app.get('/seats-status', (req, res) => {
   clearExpiredLocks();
-  res.json({ soldSeats, lockedSeats });
+ const publicLockedSeats = {};
+for (const [seatId, info] of Object.entries(lockedSeats)) {
+  publicLockedSeats[seatId] = { userId: info.userId };
+}
+
+res.json({ soldSeats, lockedSeats: publicLockedSeats });
+
 });
 
 // Koltuk kilitle
@@ -67,13 +73,16 @@ app.post('/lock-seats', (req, res) => {
   const locked = [];
   const now = Date.now();
 
-  selectedSeats.forEach(seatId => {
-    if (soldSeats.includes(seatId)) return;          // Satılmışsa atla
-    if (!lockedSeats[seatId]) {                      // Kilitli değilse kilitle
-      lockedSeats[seatId] = { userId, timestamp: now };
-      locked.push(seatId);
-    }
-  });
+selectedSeats.forEach(seatId => {
+  if (soldSeats.includes(seatId)) return; // Satılmışsa atla
+
+  // Kilitli değilse VEYA aynı kullanıcıysa
+  if (!lockedSeats[seatId] || lockedSeats[seatId].userId === userId) {
+    lockedSeats[seatId] = { userId, timestamp: now };
+    locked.push(seatId);
+  }
+});
+
 
   res.json({ lockedSeats: locked });
 });

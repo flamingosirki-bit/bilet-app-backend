@@ -1,3 +1,10 @@
+users.push({
+  id: "test-user-1",
+  email: "test@test.com",
+  passwordHash: await bcrypt.hash("123456", 10),
+  bonus: 0
+});
+
 // ------------------ IMPORTS ------------------ //
 const express = require('express');
 const cors = require('cors');

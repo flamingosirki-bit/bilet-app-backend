@@ -1,10 +1,3 @@
-users.push({
-  id: "test-user-1",
-  email: "test@test.com",
-  passwordHash: await bcrypt.hash("123456", 10),
-  bonus: 0
-});
-
 // ------------------ IMPORTS ------------------ //
 const express = require('express');
 const cors = require('cors');
@@ -14,6 +7,9 @@ const bcrypt = require("bcryptjs");
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
+// ------------------ BODY PARSER ------------------ //
+app.use(express.json());
+
 // ------------------ CORS AYARI ------------------ //
 const allowedOrigins = [
   'https://bilet-app-frontend-1.onrender.com',
@@ -22,7 +18,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // Postman gibi araçlar için
     if (!allowedOrigins.includes(origin)) {
       return callback(new Error('CORS error'), false);
     }
@@ -31,39 +27,43 @@ app.use(cors({
   credentials: true
 }));
 
-// ------------------ BODY PARSER ------------------ //
-app.use(express.json());
-
 // ------------------ SEAT DATA ------------------ //
 let soldSeats = [];
-let lockedSeats = {};
+let lockedSeats = {}; // { seatId: {userId, timestamp} }
 
 // ------------------ USER DATA ------------------ //
-let users = [];
+let users = []; // önce tanımla
 
-// ------------------ REGISTER ------------------ //
-app.post("/register", async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password)
-    return res.status(400).json({ message: "Email ve şifre zorunlu" });
-
-  if (users.find(u => u.email === email))
-    return res.status(400).json({ message: "Bu email zaten kayıtlı" });
-
-  const passwordHash = await bcrypt.hash(password, 10);
-
+// ------------------ TEST KULLANICI ------------------ //
+async function addTestUser() {
+  const passwordHash = await bcrypt.hash("123456", 10);
   users.push({
-    id: Date.now().toString(),
-    email,
+    id: "test-user-1",
+    email: "test@test.com",
     passwordHash,
     bonus: 0
   });
+}
+addTestUser(); // çağır
 
-  res.json({ message: "Kayıt başarılı" });
+// ------------------ LOCK CONFIG ------------------ //
+const LOCK_TIMEOUT = 5 * 60 * 1000; // 5 dk
+
+function clearExpiredLocks() {
+  const now = Date.now();
+  for (const [seatId, info] of Object.entries(lockedSeats)) {
+    if (now - info.timestamp > LOCK_TIMEOUT) {
+      delete lockedSeats[seatId];
+    }
+  }
+}
+
+// ------------------ ROUTES ------------------ //
+app.get('/', (req, res) => {
+  res.send('Bilet App Backend çalışıyor!');
 });
 
-// ------------------ LOGIN ------------------ //
+// LOGIN
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -88,24 +88,29 @@ app.post("/login", async (req, res) => {
   });
 });
 
-// ------------------ LOCK CONFIG ------------------ //
-const LOCK_TIMEOUT = 5 * 60 * 1000;
+// REGISTER
+app.post("/register", async (req, res) => {
+  const { email, password } = req.body;
 
-// ------------------ CLEAR LOCKS ------------------ //
-function clearExpiredLocks() {
-  const now = Date.now();
-  for (const [seatId, info] of Object.entries(lockedSeats)) {
-    if (now - info.timestamp > LOCK_TIMEOUT) {
-      delete lockedSeats[seatId];
-    }
-  }
-}
+  if (!email || !password)
+    return res.status(400).json({ message: "Email ve şifre zorunlu" });
 
-// ------------------ ROUTES ------------------ //
-app.get('/', (req, res) => {
-  res.send('Bilet App Backend çalışıyor!');
+  if (users.find(u => u.email === email))
+    return res.status(400).json({ message: "Bu email zaten kayıtlı" });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  users.push({
+    id: Date.now().toString(),
+    email,
+    passwordHash,
+    bonus: 0
+  });
+
+  res.json({ message: "Kayıt başarılı" });
 });
 
+// SEATS STATUS
 app.get('/seats-status', (req, res) => {
   clearExpiredLocks();
   const publicLockedSeats = {};
@@ -115,6 +120,7 @@ app.get('/seats-status', (req, res) => {
   res.json({ soldSeats, lockedSeats: publicLockedSeats });
 });
 
+// LOCK SEATS
 app.post('/lock-seats', (req, res) => {
   const { selectedSeats, userId } = req.body;
   const now = Date.now();
@@ -131,6 +137,7 @@ app.post('/lock-seats', (req, res) => {
   res.json({ lockedSeats: locked });
 });
 
+// UNLOCK SEATS
 app.post('/unlock-seats', (req, res) => {
   const { selectedSeats, userId } = req.body;
   selectedSeats.forEach(seatId => {
@@ -141,6 +148,7 @@ app.post('/unlock-seats', (req, res) => {
   res.json({ success: true });
 });
 
+// CHECKOUT
 app.post('/checkout', (req, res) => {
   const { cart, userId } = req.body;
   const purchased = [];
@@ -160,4 +168,5 @@ app.post('/checkout', (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server ${PORT} portunda çalışıyor`));
 
+// LOCK TEMİZLEME
 setInterval(clearExpiredLocks, 60 * 1000);

@@ -68,3 +68,6 @@ app.post("/checkout",(req,res)=>{
 });
 
 app.listen(5000,()=>console.log("Backend çalışıyor"));
+app.get("/", (req, res) => {
+  res.send("Bilet App Backend çalışıyor 🚀");
+});
